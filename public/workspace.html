@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><title>Stockroom — Electronics inventory</title>
+<link rel="stylesheet" href="/studio/studio.css"><script src="/studio/studio.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div id="previewBanner" class="preview-banner" hidden>Design preview · simulated records · not connected to your PostgreSQL database</div>
+<div id="shade" class="shade" hidden></div>
+<aside id="sidebar" class="sidebar" aria-label="Main navigation">
+  <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true">s.</span><span>stockroom<small>Electronics inventory</small></span></a>
+  <div class="sidebar-label">WORKSPACE</div><nav id="nav"></nav>
+  <div class="sidebar-bottom">
+    <div class="sidebar-note"><span class="live-dot" aria-hidden="true"></span><span id="connectionLabel">Connecting to your store</span></div>
+    <a href="/endterm.html" class="utility" id="scannerLink">Barcode simulator <span aria-hidden="true">↗</span></a>
+    <a href="/analysis.html" class="utility" id="archiveLink">Coursework reports <span aria-hidden="true">↗</span></a>
+    <a href="/index.html" class="utility">Original interface <span aria-hidden="true">↗</span></a>
+    <button id="accountButton" class="account" type="button"><span class="avatar" id="avatar">G</span><span><strong id="accountName">Guest</strong><small id="accountRole">Browse the catalogue</small></span><span aria-hidden="true">↗</span></button>
+  </div>
+</aside>
+<div class="app-main">
+<header class="topbar">
+  <div class="top-left"><button id="menuButton" class="icon-button mobile-menu" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">☰</button><span class="crumb">STORE OPERATIONS <span>/</span> <strong id="crumbPage">CATALOGUE</strong></span></div>
+  <div class="top-right"><span id="sync" class="sync">Not yet synced</span><button id="refreshButton" class="icon-button" title="Refresh live data" aria-label="Refresh live data">↻</button><button id="signInButton" class="button small">Sign in</button><button id="logoutButton" class="button small secondary" hidden>Log out</button></div>
+</header>
+<main id="main" tabindex="-1">
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <div id="page"></div>
+</main>
+<footer class="page-footer"><span>Live inventory &amp; low-stock alerts</span><span>SE-2626 · Coursework prototype</span></footer>
+</div>
+<dialog id="loginDialog" class="modal login-modal" aria-labelledby="loginTitle">
+  <button class="icon-button dialog-close" data-close="loginDialog" aria-label="Close sign in">×</button>
+  <div class="eyebrow">YOUR WORKSPACE</div><h2 id="loginTitle">Welcome back.</h2><p class="muted">Sign in to manage your store.</p>
+  <form id="loginForm"><label>Email<input id="email" type="email" autocomplete="username" required></label><label>Password<input id="password" type="password" autocomplete="current-password" required></label><p id="loginError" class="inline-message" role="alert"></p><button id="loginSubmit" class="button full" type="submit">Sign in <span aria-hidden="true">→</span></button></form>
+  <details id="demoAccounts" class="demo-accounts" hidden><summary>Coursework demo accounts</summary><div id="demoContent"></div></details>
+</dialog>
+<dialog id="productDialog" class="product-dialog" aria-labelledby="productTitle"><div id="productBody"></div></dialog>
+<dialog id="stockDialog" class="modal" aria-labelledby="stockTitle"><button class="icon-button dialog-close" data-close="stockDialog" aria-label="Close stock form">×</button><div class="eyebrow">INVENTORY OPERATION</div><h2 id="stockTitle">Record a change</h2><p id="stockProduct" class="muted"></p>
+<form id="stockForm"><input id="stockId" type="hidden"><div class="form-row"><label>Operation<select id="stockReason"><option value="sale">Sale</option><option value="delivery">Delivery</option><option value="correction">Correction</option></select></label><label id="stockQtyLabel">Units<input id="stockQty" type="number" min="1" max="10000" step="1" value="1" required></label></div><div id="stockPreview" class="change-preview"></div><label class="check"><input id="stockSound" type="checkbox"> Sound for a new low-stock alert</label><p id="stockError" class="inline-message" role="alert"></p><button id="stockSubmit" class="button full" type="submit">Confirm stock change</button><p class="fine-print">This records an actual movement in the coursework database. A plan or a scan does not change stock.</p></form></dialog>
+</body></html>

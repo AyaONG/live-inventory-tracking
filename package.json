@@ -1,0 +1,16 @@
+{
+  "name": "inventory-app",
+  "version": "1.0.0",
+  "description": "Inventory tracking with low-stock alerts for small electronics stores",
+  "main": "server.js",
+  "scripts": {
+    "schema": "psql -d inventory_db -f sql/schema.sql",
+    "seed": "node seed.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  }
+}

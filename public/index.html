@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Electronics store inventory</title>
+<link rel="icon" href="img/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css"><script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#catalogue">Skip to catalogue</a>
+<header><img src="img/logo.svg" alt="" width="40" height="40"><div><h1>Electronics store inventory</h1><p class="muted">Stock records &amp; product check videos</p></div><a class="text-link" href="endterm.html">End-term workbench</a><button id="showLogin" class="secondary push">Log in</button></header>
+<section id="loginBox" class="card login">
+<h2>Log in</h2>
+<p id="demoHint" class="demo-hint" hidden></p>
+<form id="loginForm">
+<label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+<div class="actions"><button id="loginBtn" type="submit">Log in</button><button id="browseBtn" type="button" class="secondary">Browse as guest</button></div>
+<div id="loginMsg" class="err" role="alert"></div>
+</form>
+</section>
+<div class="account-bar"><span id="who">Guest · read-only catalogue</span><button id="logout" class="secondary" hidden>Log out</button></div>
+<p id="roleNote" class="role-note">You can view products and published videos. Stock changes require a staff account.</p>
+<div id="globalMsg" role="status" aria-live="polite"></div>
+<main class="workspace">
+<section class="card" id="catalogue">
+<div class="section-heading"><h2>Products <span id="productCount" class="muted"></span></h2><button id="refresh" class="secondary">Refresh</button></div>
+<div class="filters"><div><label for="search">Name or SKU</label><input id="search" type="search" placeholder="Search products"></div><div><label for="category">Category</label><select id="category"><option value="">All categories</option></select></div></div>
+<p id="syncInfo" class="small muted" role="status">Connecting…</p><p id="timingInfo" class="small muted"></p><label class="toggle"><input id="autoRefresh" type="checkbox" checked>Auto-refresh every 10 seconds</label>
+<label class="toggle"><input id="lowOnly" type="checkbox">Show only low stock</label>
+<div class="scroll" tabindex="0" aria-label="Scrollable product table"><table><thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Video</th><th>Open</th></tr></thead><tbody id="products"></tbody></table></div>
+<p class="muted small">Photographs illustrate categories, not every exact model. Select a product to view its own videos.</p>
+</section>
+<section id="detail" class="card" hidden aria-labelledby="detailTitle">
+<p id="detailSku" class="eyebrow"></p><h2 id="detailTitle"></h2>
+<figure class="preview"><img id="preview" width="160" height="160" alt=""><figcaption id="previewCap"></figcaption></figure>
+<p id="detailNumbers"></p>
+<details id="stockSection" hidden open><summary>Record stock change</summary>
+<form id="stockForm"><div class="filters"><div><label for="reason">Reason</label><select id="reason"></select></div><div><label for="qty">Quantity change</label><input id="qty" type="number" value="-1" step="1" min="-10000" max="10000" required></div></div>
+<p class="muted small">Sale: negative. Delivery: positive. Corrections: administrator only.</p>
+<label class="toggle"><input id="sound" type="checkbox">Play a sound for a new low-stock alert</label>
+<button id="saveStock" type="submit">Save stock change</button><p id="stockMsg" role="status"></p></form>
+</details>
+<details id="adminSection" hidden><summary>Administrator: edit product</summary><form id="editForm">
+<label for="editName">Product name</label><input id="editName" maxlength="150" minlength="2" required>
+<div class="filters"><div><label for="editPrice">Price (KZT)</label><input id="editPrice" type="number" min="0" max="10000000" step="0.01" required></div><div><label for="editThreshold">Reorder threshold</label><input id="editThreshold" type="number" min="0" max="10000" step="1" required></div></div>
+<button type="submit" id="saveProduct">Save product details</button><p id="editMsg" role="status"></p></form></details>
+<div class="video-section"><h3>Product check videos</h3><p class="muted small">A store demonstration is not an independent inspection or a guarantee for every item in stock.</p>
+<div id="videoList" aria-live="polite"></div>
+<div id="playerBox" hidden><h4 id="videoTitle"></h4><video id="player" controls playsinline preload="none" aria-label="Product check video"></video><p id="videoScope" class="muted small"></p><a id="downloadVideo" class="text-link">Download MP4</a><details><summary>Transcript and description</summary><p id="videoTranscript" class="transcript"></p></details></div>
+</div>
+<details id="uploadSection" hidden><summary>Upload a product check video</summary>
+<p class="small muted">MP4 · H.264 video · AAC or no audio · up to 60 seconds · up to 40 MiB · up to 1080p. A new clip remains private until an administrator publishes it.</p>
+<form id="uploadForm"><label for="videoFile">Video file</label><input id="videoFile" type="file" accept="video/mp4,.mp4" required>
+<label for="videoName">Title</label><input id="videoName" minlength="3" maxlength="120" required placeholder="For example: Headphones — playback demonstration">
+<label for="scope">What does this recording show?</label><select id="scope"><option value="model_example">An example of this model</option><option value="specific_unit">A specific unit or batch</option></select>
+<div id="unitBox" hidden><label for="unitReference">Store unit / batch reference</label><input id="unitReference" maxlength="100" placeholder="Internal reference, not personal customer data"></div>
+<label for="recordedOn">Recording date (optional)</label><input id="recordedOn" type="date">
+<label for="transcript">Transcript and description</label><textarea id="transcript" rows="5" minlength="10" maxlength="5000" required placeholder="Describe what is tested and the visible result. Include all spoken words; describe important actions if the clip is silent."></textarea>
+<label class="toggle"><input id="ownContent" type="checkbox" required>Our team owns this recording and has permission from anyone shown.</label>
+<button type="submit" id="uploadBtn">Upload for review</button><p id="uploadMsg" role="status" aria-live="polite"></p></form>
+</details>
+<details id="historySection" hidden><summary>Recent stock movements</summary><div id="history" class="small"></div></details>
+</section>
+</main>
+<section id="alertsSection" class="card" hidden><h2>Open low-stock alerts <span id="alertCount"></span></h2><div class="scroll"><table><thead><tr><th>SKU</th><th>Product</th><th>Current quantity</th></tr></thead><tbody id="alerts"></tbody></table></div></section>
+<footer class="muted small">Educational prototype · local demonstration accounts only · product data is synthetic.</footer>
+</body></html>
