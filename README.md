@@ -1,88 +1,65 @@
-# Inventory tracking with low-stock alerts (small electronics stores)
+# Stockroom — Final ICT Project (SE-2626)
 
-Prototype for ICT Assignment 3: PostgreSQL database + Node.js/Express API + simple web page.
+**Live Inventory Tracking and Low-Stock Alerts for Small Electronics Stores**  
+Astana IT University · ICT Final Project · November 2026  
+Completed functional **coursework prototype**; synthetic data, not a production store.
+
+## GitHub and team
+- [Repository](https://github.com/AyaONG/live-inventory-tracking) — select `main`, containing merged PRs #1–#6.
+- Ayazhan Ongdakanova — Developer: API, PostgreSQL, archive, video Publish, integration.
+- Aruzhan Zhekebayeva — Frontend: unified Stockroom, barcode and historical-report UI.
+- Aruzhan Kobzhassarova — Analyst: metric logic, requirements, testing documentation.
+
+## What works and what remains outside scope
+Stockroom provides Buyer/Guest catalogue access, authenticated Seller stock updates, Administrator product management, archive/restore with preserved history, threshold alerts, moderated local MP4 video, live analytics, separate A3 reporting and a **simulated** barcode scan/confirm workflow. This does **not** include physical-camera barcode capture, payment, delivery, real supplier orders or guaranteed cloud availability.
 
 ## Requirements
-- PostgreSQL 16 or newer (Postgres.app on Mac), running on port 5432
-- Node.js 18 or newer (https://nodejs.org, LTS version)
-
-## Run (Mac, Postgres.app)
-```
-npm install
-createdb inventory_db
-psql -d inventory_db -f sql/schema.sql
-node seed.js
-npm start
-```
-Open http://localhost:3000 and log in:
-- owner@shop.example / Demo1234!  (all test accounts use the same demo password; it is stored only as a bcrypt hash)
-
-## Other database settings
-Set `DATABASE_URL`, for example `DATABASE_URL=postgresql://user:password@localhost:5432/inventory_db npm start`
-
-## What is where
-- `sql/schema.sql` - CREATE TABLE statements with all constraints
-- `seed.js` - loads 120 products and test data in all other tables
-- `server.js` - API: login (bcrypt), read products, write stock change, alerts
-- `public/index.html` - web interface
-- `docs/queries.sql` - queries used in the report and at the defense
-
-## Backup and restore
-```
-pg_dump inventory_db > backup.sql
-createdb inventory_restore
-psql -d inventory_restore -f backup.sql
-```
-
-## Assignment 4 (multimedia)
-- `public/img/` logo and icon sprite (SVG); `public/img/optimised/` WebP photos; `public/img/original/` full-size photos for the "before" measurement
-- `public/media/alert.wav` notification sound (played only after the user presses Save and ticks the sound checkbox)
-- Open `http://localhost:3000/?raw=1` to load the original photos (before optimisation), `http://localhost:3000/` for the optimised ones
-- `tools/optimise.py` converts photos from `originals/` to WebP; `tools/experiment.py` runs the format experiment; `tools/contrast.py` checks colour contrast; `tools/make_sound.py` creates the alert sound
-- Python tools need Pillow: `pip3 install pillow numpy`
-
-<!-- FINAL-TEAM-README-START -->
-
-## Final Project — Stockroom (SE-2626)
-
-**Live Inventory Tracking and Low-Stock Alerts for Small Electronics Stores**. Coursework demonstration on Node.js/Express, PostgreSQL, HTML/CSS/JavaScript, image/video media and a browser barcode simulator. Synthetic product data.
-
-### Local requirements
-
-Node.js LTS, PostgreSQL with a restored **coursework** `inventory_db` (not committed to GitHub), FFmpeg/FFprobe for new MP4 uploads. Run `npm ci`, then `npm start`. Open `http://localhost:3000` (Stockroom), `/endterm.html` (barcode simulator), `/analysis.html` (saved coursework reports).
-
-**Database warning:** existing Mac data already includes products, movements and video metadata. `npm run schema` and `npm run seed` reset/reseed data — never run them on the working database. Other teammates can review the frontend, tests and code without recreating this database. Coordinate a sanitized, explicitly authorized demo-only database if independent live startup is required.
-
-### Demo accounts / role descriptions
-
-| Role | Coursework login | Rights |
-|---|---|---|
-| Administrator | `owner@shop.example` | management, analytics, moderation |
-| Seller | `employee1@shop.example` | stock movements, video submission |
-| Buyer | `customer@shop.example` | catalogue, published videos |
-
-**Do not commit production secrets.** Demo password is shared privately with the instructor, not published in a public repository. Demo credentials are not production-ready. When operating a public Cloudflare Tunnel, use only synthetic content and shut it down after demonstration. The current sample implementation may disclose demo login details at `/api/config` in demo mode; do not treat it as production security.
-
-### Architecture (as built)
-
-Browser (public catalogue and role-dependent Stockroom views) ↔ local Express API (`localhost:3000`) ↔ PostgreSQL `inventory_db`. Stored MP4 content is in `storage/videos/` on the local Mac; video metadata and moderation history reside in PostgreSQL. Public external HTTPS uses a **temporary Cloudflare Quick Tunnel**; Express locally is HTTP. A3 historical `ayazhan_inventory` is a separate analytical source, not a migrated live dataset. The barcode workflow is a **browser simulation**, not connected camera or wireless scanner.
-
-### Team responsibilities and GitHub evidence
-
-- **Aruzhan Zhekebayeva — Designer / Frontend:** unified styling of Workbench, historic reporting and classic catalogue; mobile and accessibility review.
-- **Ayazhan Ongdakanova — Developer:** application integration, SQL/API video moderation repair, deployment and verification.
-- **Aruzhan Kobzhassarova — Analyst:** live business metric audit, requirement status and final external-user test evidence.
-
-Everyone works in their own `feature/...` branch and creates a Pull Request into `main`. Record individual commits under each member's own GitHub-linked email, and explain them at the individual defense.
-
-### Verification
+- Node.js LTS, PostgreSQL (local `inventory_db`), optional FFmpeg/FFprobe for video upload.
+- The original working database and `storage/videos/*.mp4` are **not** in GitHub. A fresh clone cannot reproduce your existing records and videos without a sanitized database snapshot and separately approved media assets.
+- Existing Mac data: `~/Downloads/stockroom-final`; start **Postgres.app**, then:
 
 ```bash
-node --test tests/video_publish_contract.test.cjs tests/final_analytics_logic.test.cjs
+cd "$HOME/Downloads/stockroom-final"
+git switch main
+git pull --ff-only origin main
+npm ci
+npm start
+```
+
+Open `http://localhost:3000/workspace.html` (Stockroom). Use the built-in tabs for Inventory, Analytics, Barcode Simulator, Media and archived items. `http://localhost:3000` may redirect to the workspace depending on server configuration.
+
+**Never run `npm run schema`, `node seed.js` or reset SQL on the working database.** These can destroy live coursework records. The catalogue-archive migration was applied on the developer Mac after a backup; a new database environment needs the appropriate schema and migration sequence checked before use.
+
+## Demonstration roles (synthetic accounts only)
+| Role | Email | Access |
+|---|---|---|
+| Administrator | `owner@shop.example` | Product management, archive/restore, analytics, moderation |
+| Seller | `employee1@shop.example` | Stock changes, operational features and eligible media actions |
+| Buyer | `customer@shop.example` | Public catalogue and published videos |
+
+**Share demo credentials directly with the instructor through a private channel.** The current demo mode may expose demo account details; do not use real personal/customer data or treat it as production security.
+
+## Verification
+
+```bash
+node --test tests/*.test.cjs
 node tools/final_video_preflight.cjs
 node tools/final_analytics_audit.cjs
 ```
 
-The last two require the local PostgreSQL and are read-only. For video Publish, run an additional manual live acceptance scenario with an existing Pending clip. For Final, verify three non-team users and original Stage 1 success criteria; include dated screenshots and exact data sources in the report.
+The last two inspect the developer's local PostgreSQL and files. Integration transcript on 9 November 2026: 35 automated checks passed, 0 failed. The live system was exercised by the developer and three additional non-team participants (team-reported), while the Stage 2 report provides separately measured timing benchmarks. For a reproducible defense, retain the latest screenshot/log of each role-specific workflow.
 
-<!-- FINAL-TEAM-README-END -->
+## Temporary external link
+Optional test session: keep PostgreSQL and `npm start` running, then in another terminal run:
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+Share only the generated `https://...trycloudflare.com` URL; it changes on restart. Stop the tunnel after testing. The project is **not permanently hosted**. The Final assignment accepts exact local-run instructions instead of a public deployment.
+
+## Data and architecture
+Browser → Express API (`localhost:3000`) → `inventory_db` PostgreSQL. Uploaded MP4 files are stored under local `storage/videos/`; their metadata is in PostgreSQL. Historical Assignment 3 source `ayazhan_inventory` is separate from the operational database. Client-facing tunnel traffic uses HTTPS, while the local development server uses HTTP.
+
+## Evidence and limits
+See `docs/final/FINAL_REQUIREMENTS.md`, `docs/final/FINAL_TEST_SUMMARY.md` and the submitted Final report for the current requirement matrix, as-built architecture and results. Six team PRs are merged. The final code-integration transcript shows 35/35 automated checks passed. Three additional external testers completed assigned tasks as reported by the analyst; participant-level timing and 360 px checks should be added only if recorded.
