@@ -22,9 +22,9 @@ test('product creation uses categories and typed payload',()=>{
  assert.match(js,/request\('\/api\/products', \{method:'POST'/);
  for(const name of ['sku','name','category_id','price','quantity','reorder_threshold']) assert.match(js,new RegExp(name));
 });
-test('delete requires exact SKU, zero stock and server confirmation',()=>{
+test('archive requires exact SKU and server confirmation at any stock quantity',()=>{
  assert.match(js,/typedSku !== current\.sku/);
- assert.match(js,/Number\(current\.quantity\) !== 0/);
+ assert.doesNotMatch(js,/Number\(current\.quantity\) !== 0/);
  assert.match(js,/method:'DELETE'/);
  assert.match(js,/confirm_sku:typedSku/);
 });
