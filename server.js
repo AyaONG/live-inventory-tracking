@@ -39,7 +39,7 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
   const isUUID = value => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   async function videoRecord(id) {
     if (!isUUID(id)) throw makeError(404, 'Video not found.');
-    const r = await pool.query('SELECT * FROM product_videos WHERE video_id=$1', [id]);
+    const r = await pool.query('SELECT v.*,p.archived_at AS product_archived_at FROM product_videos v JOIN products p ON p.product_id=v.product_id WHERE v.video_id=$1', [id]);
     if (!r.rows[0]) throw makeError(404, 'Video not found.');
     return r.rows[0];
   }
@@ -129,14 +129,14 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
       (p.quantity<=p.reorder_threshold) AS low_stock,
       (SELECT count(*)::int FROM product_videos v WHERE v.product_id=p.product_id AND v.status='published') AS video_count
       FROM products p JOIN categories c ON c.category_id=p.category_id
-      WHERE ($1='' OR p.name ILIKE '%'||$1||'%' OR p.sku ILIKE '%'||$1||'%')
+      WHERE p.archived_at IS NULL AND ($1='' OR p.name ILIKE '%'||$1||'%' OR p.sku ILIKE '%'||$1||'%')
       AND ($2='' OR c.name=$2) AND ($3::boolean=false OR p.quantity<=p.reorder_threshold) ORDER BY p.sku`, [q, category, req.query.low_stock === 'true']);
     res.json(r.rows);
   }));
   app.get('/api/categories', wrap(async (req, res) => res.json((await pool.query('SELECT category_id,name FROM categories ORDER BY name')).rows)));
   app.get('/api/alerts', staff, wrap(async (req, res) => res.json((await pool.query(`SELECT a.alert_id,p.product_id,p.sku,p.name,
     p.quantity,a.quantity_at_alert,a.created_at FROM alerts a JOIN products p ON p.product_id=a.product_id
-    WHERE a.is_resolved=false ORDER BY a.created_at DESC`)).rows)));
+    WHERE a.is_resolved=false AND p.archived_at IS NULL ORDER BY a.created_at DESC`)).rows)));
   app.get('/api/products/:id/movements', staff, wrap(async (req, res) => {
     const id = positiveId(req.params.id); if (!id) throw makeError(400, 'Invalid product.');
     res.json((await pool.query(`SELECT m.movement_id,m.quantity_change,m.reason,m.created_at,u.email
@@ -149,11 +149,11 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const r = await client.query(`UPDATE products SET quantity=quantity+$1 WHERE product_id=$2 AND quantity+$1>=0
+      const r = await client.query(`UPDATE products SET quantity=quantity+$1 WHERE product_id=$2 AND quantity+$1>=0 AND archived_at IS NULL
         RETURNING product_id,sku,name,quantity,reorder_threshold`, [quantity_change, product_id]);
       if (!r.rows[0]) {
-        const exists = await client.query('SELECT 1 FROM products WHERE product_id=$1', [product_id]);
-        throw makeError(exists.rowCount ? 409 : 404, exists.rowCount ? 'Not enough stock for this change.' : 'Product not found.');
+        const exists = await client.query('SELECT archived_at FROM products WHERE product_id=$1', [product_id]);
+        throw makeError(exists.rowCount ? 409 : 404, exists.rows[0]?.archived_at ? 'Product removed from active catalog.' : exists.rowCount ? 'Not enough stock for this change.' : 'Product not found.');
       }
       const p = r.rows[0];
       await client.query('INSERT INTO stock_movements (product_id,user_id,quantity_change,reason) VALUES ($1,$2,$3,$4)', [product_id, req.user.user_id, quantity_change, reason]);
@@ -188,37 +188,77 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
   }));
 
   // Final R1: safe delete: zero quantity, explicit SKU confirmation, no referenced history.
+  // Final R1: a catalog removal preserves the record, stock quantity and all foreign-key history.
+  // API path is kept for compatibility with the existing R1 Delete button.
   app.delete('/api/products/:id', admin, wrap(async (req, res) => {
     const id = positiveId(req.params.id);
     if (!id) throw makeError(400, 'Invalid product ID.');
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const r = await client.query('SELECT product_id,sku,quantity FROM products WHERE product_id=$1 FOR UPDATE', [id]);
-      const p = r.rows[0];
+      const result = await client.query('SELECT product_id,sku,quantity,archived_at FROM products WHERE product_id=$1 FOR UPDATE', [id]);
+      const p = result.rows[0];
       if (!p) throw makeError(404, 'Product not found.');
       if (!validDeleteConfirmation(req.body?.confirm_sku, p.sku)) {
-        throw makeError(400, 'Enter the exact product SKU to confirm deletion.');
+        throw makeError(400, 'Enter the exact product SKU to confirm catalog removal.');
       }
-      if (p.quantity !== 0) throw makeError(409, 'Quantity must be zero before deleting a product.');
-      // Never discard linked stock history, videos, scanner events or supplier data.
-      const dependent = ['stock_movements', 'product_videos', 'scan_events', 'product_suppliers', 'product_barcodes'];
-      for (const table of dependent) {
-        const exists = await client.query('SELECT to_regclass($1) AS relation', [`public.${table}`]);
-        if (exists.rows[0]?.relation) {
-          const linked = await client.query(`SELECT 1 FROM ${table} WHERE product_id=$1 LIMIT 1`, [id]);
-          if (linked.rowCount) throw makeError(409, `Cannot delete: product has linked records in ${table}. Preserve its history.`);
-        }
-      }
-      const deleted = await client.query('DELETE FROM products WHERE product_id=$1 RETURNING product_id', [id]);
-      if (!deleted.rowCount) throw makeError(404, 'Product not found.');
+      if (p.archived_at) throw makeError(409, 'Product is already removed from the active catalog.');
+      const archived = await client.query(`UPDATE products SET archived_at=now(), archived_by=$2
+        WHERE product_id=$1 AND archived_at IS NULL
+        RETURNING product_id,sku,quantity,archived_at`, [id, req.user.user_id]);
+      await client.query('UPDATE alerts SET is_resolved=true WHERE product_id=$1 AND is_resolved=false', [id]);
+      await client.query(`INSERT INTO product_catalog_events(product_id,performed_by,action,stock_at_event)
+        VALUES($1,$2,'archived',$3)`, [id, req.user.user_id, p.quantity]);
       await client.query('COMMIT');
-      res.json({ ok: true, deleted_product_id: id });
-    } catch (e) {
-      await client.query('ROLLBACK');
-      if (e.code === '23503') throw makeError(409, 'Cannot delete: another record refers to this product.');
-      throw e;
-    } finally { client.release(); }
+      res.json({ ok: true, archived: true, deleted_from_catalog: true,
+        product_id: id, sku: p.sku, retained_quantity: p.quantity,
+        archived_at: archived.rows[0].archived_at,
+        message: 'Removed from the active catalog. Product record and stock movement history were preserved.' });
+    } catch (e) { await client.query('ROLLBACK'); throw e; }
+    finally { client.release(); }
+  }));
+
+  // Administrator audit: archived items and their past stock movement totals stay visible.
+  app.get('/api/products/archived', admin, wrap(async (req, res) => {
+    const r = await pool.query(`SELECT p.product_id,p.sku,p.name,p.quantity,p.price,p.archived_at,
+      c.name AS category, u.email AS archived_by_email,
+      (SELECT count(*)::int FROM stock_movements m WHERE m.product_id=p.product_id) AS movement_count,
+      (SELECT max(m.created_at) FROM stock_movements m WHERE m.product_id=p.product_id) AS last_movement_at
+      FROM products p JOIN categories c ON c.category_id=p.category_id
+      LEFT JOIN users u ON u.user_id=p.archived_by
+      WHERE p.archived_at IS NOT NULL ORDER BY p.archived_at DESC, p.product_id DESC LIMIT 500`);
+    res.json(r.rows);
+  }));
+
+  app.get('/api/products/:id/catalog-history', admin, wrap(async (req, res) => {
+    const id = positiveId(req.params.id);
+    if (!id) throw makeError(400, 'Invalid product ID.');
+    if (!(await pool.query('SELECT 1 FROM products WHERE product_id=$1', [id])).rowCount) throw makeError(404, 'Product not found.');
+    const r = await pool.query(`SELECT e.catalog_event_id,e.action,e.stock_at_event,e.created_at,u.email AS performed_by
+      FROM product_catalog_events e JOIN users u ON u.user_id=e.performed_by
+      WHERE e.product_id=$1 ORDER BY e.catalog_event_id DESC LIMIT 100`, [id]);
+    res.json(r.rows);
+  }));
+
+  app.post('/api/products/:id/restore', admin, wrap(async (req, res) => {
+    const id = positiveId(req.params.id);
+    if (!id) throw makeError(400, 'Invalid product ID.');
+    const c = await pool.connect();
+    try {
+      await c.query('BEGIN');
+      const r = await c.query('SELECT product_id,sku,quantity,reorder_threshold,archived_at FROM products WHERE product_id=$1 FOR UPDATE', [id]);
+      const p = r.rows[0];
+      if (!p) throw makeError(404, 'Product not found.');
+      if (!p.archived_at) throw makeError(409, 'Product is already active.');
+      if (!validDeleteConfirmation(req.body?.confirm_sku, p.sku)) throw makeError(400, 'Enter the exact SKU to restore this product.');
+      await c.query('UPDATE products SET archived_at=NULL,archived_by=NULL WHERE product_id=$1', [id]);
+      await refreshAlert(c, p);
+      await c.query(`INSERT INTO product_catalog_events(product_id,performed_by,action,stock_at_event)
+        VALUES($1,$2,'restored',$3)`, [id, req.user.user_id, p.quantity]);
+      await c.query('COMMIT');
+      res.json({ ok:true,restored:true,product_id:id,sku:p.sku,quantity:p.quantity });
+    } catch (e) { await c.query('ROLLBACK'); throw e; }
+    finally { c.release(); }
   }));
 
   app.patch('/api/products/:id', admin, wrap(async (req, res) => {
@@ -228,7 +268,7 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const r = await client.query('UPDATE products SET name=$1,price=$2,reorder_threshold=$3 WHERE product_id=$4 RETURNING *', [b.name.trim(), b.price.toFixed(2), b.reorder_threshold, id]);
+      const r = await client.query('UPDATE products SET name=$1,price=$2,reorder_threshold=$3 WHERE product_id=$4 AND archived_at IS NULL RETURNING *', [b.name.trim(), b.price.toFixed(2), b.reorder_threshold, id]);
       if (!r.rows[0]) throw makeError(404, 'Product not found.');
       await refreshAlert(client, r.rows[0]); await client.query('COMMIT'); res.json({ ok: true });
     } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
@@ -245,7 +285,7 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
       await c.query('SELECT user_id FROM users WHERE user_id=$1 FOR UPDATE', [req.user.user_id]);
       const outstanding = await c.query("SELECT count(*)::int AS n FROM product_videos WHERE uploaded_by=$1 AND status='uploading'", [req.user.user_id]);
       if (outstanding.rows[0].n >= 3) throw makeError(409, 'Finish or cancel your existing uploads before starting another.');
-      if (!(await c.query('SELECT 1 FROM products WHERE product_id=$1', [id])).rowCount) throw makeError(404, 'Product not found.');
+      if (!(await c.query('SELECT 1 FROM products WHERE product_id=$1 AND archived_at IS NULL', [id])).rowCount) throw makeError(404, 'Product not found.');
       const videoId = crypto.randomUUID();
       await c.query(`INSERT INTO product_videos
         (video_id,product_id,uploaded_by,title,transcript,scope,unit_reference,recorded_on,own_content,file_name)
@@ -286,7 +326,7 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
   app.get('/api/products/:id/videos', wrap(async (req, res) => {
     const id = positiveId(req.params.id); if (!id) throw makeError(400, 'Invalid product.');
     const r = await pool.query(`SELECT v.*,p.sku FROM product_videos v JOIN products p ON p.product_id=v.product_id
-      WHERE v.product_id=$1 ORDER BY v.created_at DESC`, [id]);
+      WHERE v.product_id=$1 AND (p.archived_at IS NULL OR $2::boolean) ORDER BY v.created_at DESC`, [id, req.user?.role === 'owner']);
     res.json(r.rows.filter(v => canViewVideo(req.user, v)).map(publicVideo));
   }));
   app.patch('/api/videos/:id/status', admin, wrap(async (req, res) => {
@@ -313,7 +353,7 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
   }));
   const serveVideo = download => wrap(async (req, res, next) => {
     const v = await videoRecord(req.params.id);
-    if (v.status === 'uploading' || !canViewVideo(req.user, v)) throw makeError(404, 'Video not found.');
+    if ((v.product_archived_at && req.user?.role !== 'owner') || v.status === 'uploading' || !canViewVideo(req.user, v)) throw makeError(404, 'Video not found.');
     if (!/^[0-9a-f-]{36}\.mp4$/.test(v.file_name)) throw makeError(404, 'Video not found.');
     res.type('video/mp4');
     if (download) res.setHeader('Content-Disposition', `attachment; filename="product-check-${v.video_id}.mp4"`);
