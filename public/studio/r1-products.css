@@ -1,0 +1,17 @@
+/* Stockroom Final R1: extends the existing palette and form components. */
+.r1-create-dialog { width: min(560px, calc(100vw - 28px)); }
+.r1-create-dialog h2 { margin-bottom: 9px; }
+.r1-create-dialog .r1-caption { margin-top: 9px; font-size: 12px; line-height: 1.55; }
+.r1-create-dialog .form-row { gap: 12px; }
+.r1-create-dialog form label { min-width: 0; }
+.r1-delete-panel { margin-top: 25px; padding: 19px 0 7px; border-top: 1px solid var(--line); }
+.r1-delete-panel h3 { color: var(--red); font-size: 14px; }
+.r1-delete-panel p { margin: 8px 0; line-height: 1.55; }
+.r1-delete-panel form { margin-top: 12px; }
+.r1-delete-panel .button.danger { max-width: 100%; white-space: normal; }
+#r1AddProduct { white-space: nowrap; }
+@media (max-width: 430px) {
+  .r1-create-dialog .form-row { grid-template-columns: 1fr; gap: 0; }
+  #r1AddProduct { width: 100%; }
+  .r1-delete-panel .button.danger { width: 100%; }
+}

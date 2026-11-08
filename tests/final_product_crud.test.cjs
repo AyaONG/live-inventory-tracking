@@ -26,10 +26,11 @@ test('deletion requires matching SKU', () => {
   assert.equal(validDeleteConfirmation('TEST-PWR-999','TEST-PWR-999'),true);
   assert.equal(validDeleteConfirmation('WRONG','TEST-PWR-999'),false);
 });
-test('R1 server routes are administrator-only and dependents protected', () => {
+test('R1 server routes are administrator-only and archive preserves related data', () => {
   const source=fs.readFileSync(path.join(__dirname,'..','server.js'),'utf8');
   assert.match(source,/app\.post\('\/api\/products', admin/);
   assert.match(source,/app\.delete\('\/api\/products\/:id', admin/);
-  assert.match(source,/stock_movements.*product_videos.*scan_events.*product_suppliers.*product_barcodes/);
-  assert.match(source,/FROM products WHERE product_id=\$1 FOR UPDATE/);
+  assert.match(source,/app\.delete\('\/api\/products\/:id', admin/);
+  assert.match(source,/UPDATE products SET archived_at=now\(\), archived_by=\$2/);
+  assert.match(source,/INSERT INTO product_catalog_events/);
 });
