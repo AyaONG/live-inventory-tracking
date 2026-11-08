@@ -24,3 +24,5 @@ endterm_output/
 server.js.before_*
 _final_backup_*
 # FINAL-KIT-IGNORE-END
+
+/endterm/*.mp4
