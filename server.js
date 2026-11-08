@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const { ROLE_LABELS, canWrite, positiveId, validateMovement, validateVideoMetadata, canViewVideo, cookieToken, sessionKey } = require('./lib/security');
 const { receiveVideo, inspectVideo, MAX_VIDEO_BYTES, MAX_SECONDS } = require('./lib/video');
+const { validateCreateProduct, validDeleteConfirmation } = require('./lib/product-crud');
 
 function createApp({ pool, analysis = null, root = __dirname, demoMode = process.env.DEMO_MODE !== '0' }) {
   const app = express();
@@ -162,6 +163,64 @@ function createApp({ pool, analysis = null, root = __dirname, demoMode = process
     } catch (e) { await client.query('ROLLBACK'); throw e; }
     finally { client.release(); }
   }));
+  // Final R1: only Administrator may create products. No existing data is reset.
+  app.post('/api/products', admin, wrap(async (req, res) => {
+    const checked = validateCreateProduct(req.body);
+    if (checked.error) throw makeError(400, checked.error);
+    const b = checked.value;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const r = await client.query(`INSERT INTO products (sku,name,category_id,price,quantity,reorder_threshold)
+        VALUES ($1,$2,$3,$4,$5,$6)
+        RETURNING product_id,sku,name,category_id,price,quantity,reorder_threshold`,
+        [b.sku, b.name, b.category_id, b.price.toFixed(2), b.quantity, b.reorder_threshold]);
+      const p = r.rows[0];
+      const new_alert = await refreshAlert(client, p);
+      await client.query('COMMIT');
+      res.status(201).json({ ...p, low_stock: p.quantity <= p.reorder_threshold, new_alert });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      if (e.code === '23505') throw makeError(409, 'SKU already exists. Choose another SKU.');
+      if (e.code === '23503') throw makeError(400, 'Select a valid product category.');
+      throw e;
+    } finally { client.release(); }
+  }));
+
+  // Final R1: safe delete: zero quantity, explicit SKU confirmation, no referenced history.
+  app.delete('/api/products/:id', admin, wrap(async (req, res) => {
+    const id = positiveId(req.params.id);
+    if (!id) throw makeError(400, 'Invalid product ID.');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const r = await client.query('SELECT product_id,sku,quantity FROM products WHERE product_id=$1 FOR UPDATE', [id]);
+      const p = r.rows[0];
+      if (!p) throw makeError(404, 'Product not found.');
+      if (!validDeleteConfirmation(req.body?.confirm_sku, p.sku)) {
+        throw makeError(400, 'Enter the exact product SKU to confirm deletion.');
+      }
+      if (p.quantity !== 0) throw makeError(409, 'Quantity must be zero before deleting a product.');
+      // Never discard linked stock history, videos, scanner events or supplier data.
+      const dependent = ['stock_movements', 'product_videos', 'scan_events', 'product_suppliers', 'product_barcodes'];
+      for (const table of dependent) {
+        const exists = await client.query('SELECT to_regclass($1) AS relation', [`public.${table}`]);
+        if (exists.rows[0]?.relation) {
+          const linked = await client.query(`SELECT 1 FROM ${table} WHERE product_id=$1 LIMIT 1`, [id]);
+          if (linked.rowCount) throw makeError(409, `Cannot delete: product has linked records in ${table}. Preserve its history.`);
+        }
+      }
+      const deleted = await client.query('DELETE FROM products WHERE product_id=$1 RETURNING product_id', [id]);
+      if (!deleted.rowCount) throw makeError(404, 'Product not found.');
+      await client.query('COMMIT');
+      res.json({ ok: true, deleted_product_id: id });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      if (e.code === '23503') throw makeError(409, 'Cannot delete: another record refers to this product.');
+      throw e;
+    } finally { client.release(); }
+  }));
+
   app.patch('/api/products/:id', admin, wrap(async (req, res) => {
     const id = positiveId(req.params.id), b = req.body || {};
     if (!id || typeof b.name !== 'string' || b.name.trim().length < 2 || b.name.trim().length > 150 ||
