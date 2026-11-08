@@ -1,53 +1,45 @@
-# Final User Tests — Stage 2 Comparison
+# Final User Testing and Acceptance Summary
 
-## 1. Acceptance Criteria
+**Project:** Stockroom — Live Inventory Tracking and Low-Stock Alerts for Small Electronics Stores  
+**Course / group:** ICT / SE-2626  
+**Technical baseline:** merged `main` after PR #6, 9 November 2026
 
-| Criterion | Target | Stage 2 Result | Final Measured Result | Met? | Evidence |
-|---|---|---|---|---|---|
-| Buyer finds price and availability | <30 s | 15.5 s mean for 4 Buyers; one first-attempt failure | Pending external testing | TBD | External test records pending |
-| Seller updates, Buyer sees, Administrator alert | Update <20 s; visibility/alert <60 s | Seller 4.0 s; visibility 5.5 s; alert 1.5 s | Pending end-to-end testing | TBD | Database and role-based verification required |
-| Mobile usability and task success | 360 CSS px; ≥8/10 first attempts | 5/6 external attempts; exact 360 px missing | Pending 360 px verification | TBD | Mobile screenshot and task results required |
-| Search/refresh R9 | <2 s controlled average | Three non-comparable observations, all under 2 s | Pending controlled measurements | TBD | Three comparable Network measurements required |
+## Executive result
+The team completed a three-person additional external-user testing round of the integrated Stockroom interface and reported successful task completion for all three non-team users (3/3). The post-integration developer regression suite passed **35/35 automated checks**, covering product archive/restore contracts, barcode scan/confirm/retry, analytics safeguards, UI contracts, and video moderation. These complementary results support the functioning end-to-end coursework prototype.
 
-## 2. Completed Technical Tests
+The Stage 2 record contains **six distinct external testers** and separately measured time results. Stage 2 users tested a previous build, so its timing baseline is retained in a separate column rather than passed off as measurements of the final build.
 
-The final analytics package was successfully installed on the Windows development environment. Five automated analytics unit tests were executed using Node.js.
+## Success-criterion comparison
 
-**Results: 5 passed, 0 failed.**
+| Original Stage 1 criterion | Target | Stage 2 evidence (recorded) | Final integrated-build result |
+|---|---|---|---|
+| Customer price and availability search | Under 30 s | Four Buyers: 10, 12, 20, 20 s; mean 15.5 s | Three additional external tasks completed successfully (team-reported); final search seconds not individually logged |
+| Seller update, public visibility and owner alert | Update under 20 s; visibility and alert within 60 s | Two external Sellers: update 3/5 s; buyer visibility 6/5 s; owner warning 1/2 s | Workflow integrated in final system; 35/35 contract/regression checks passed; no comparable final session timings supplied |
+| Mobile layout and first-attempt independence | 360 CSS px; at least 8/10 succeed unaided on first try | Five of six external Stage 2 first attempts succeeded; phones used | Three additional users completed assigned tasks successfully; first-attempt/no-help field and exact CSS viewport were not separately recorded |
+| Search and refresh performance (R9) | Under 2 s in controlled measurements | Three different observations below 2 s, not identical conditions | Final timing series not supplied; no numeric final latency is asserted |
 
-The tests covered:
-- Sales calculations based on sold units per complete day.
-- Prevention of unreliable forecasts with insufficient sales history.
-- Correct interpretation of products with no recorded sales.
-- Detection of zero stock without sales history.
-- Rejection of invalid date inputs.
+## Human testing record — Final round
 
-The Analytics interface was opened successfully, and its indicators and charts were visible.
+| Test ID | Tester relationship | Recorded final result | What can be claimed |
+|---|---|---|---|
+| F-U01 | Outside team (team-reported) | Task completed successfully | Completion only; no time or device attributed |
+| F-U02 | Outside team (team-reported) | Task completed successfully | Completion only; no time or device attributed |
+| F-U03 | Outside team (team-reported) | Task completed successfully | Completion only; no time or device attributed |
 
-The current inventory CSV export was also downloaded and inspected. The exported file contained SKU, product name, category, price, quantity, and reorder threshold.
+**Final round completion rate:** 3/3 (100% of the three team-reported sessions). This is a descriptive completion rate for three users, **not** a claim that the original 8/10 unaided-first-attempt target was measured on ten final-build users.
 
-## 3. Identified Issues
+## Regression and engineering validation
+- `node --test tests/*.test.cjs`: **35 tests passed, 0 failed**, recorded by the developer after integration conflict resolution.
+- Create/Edit/Archive/Restore: administrator UI and backend integrated (PR #3 and #5), retaining quantity and stock history.
+- UI integration: Barcode Simulator and Historical A3 reports connected to the final Stockroom navigation (PR #6).
+- Analytics unit tests: 5/5 passed on analyst's Windows environment; stock CSV was downloaded and inspected.
+- The final system is a **functional coursework prototype**, run with local PostgreSQL and optional Cloudflare Quick Tunnel; not an always-on cloud service.
 
-**R1 — Product Management:** Source-code review by the Developer confirmed that Read and Update are implemented, while Create and Delete are missing. The Developer and UI Designer are responsible for completing these functions. Full CRUD acceptance testing is required after integration.
+## Evidence references
+- GitHub PRs: https://github.com/AyaONG/live-inventory-tracking/pulls?q=is%3Apr+is%3Aclosed
+- `tests/` in the repository; developer console log of 35/35 tests.
+- Original measured timings and first-attempt outcomes: `Group_Team_ICT_ProjectStage2-2.pdf`, Part B.
+- Final three-user outcomes: reported by the SE-2626 team in the final integration handoff; add anonymized primary records if available.
 
-**R6 — Export:** Current stock CSV export was verified. Export of recent stock changes remains unverified.
-
-## 4. External User Testing
-
-Three new external user tests are required for final acceptance. Participant tasks, devices, assistance status, completion times, and evidence must be recorded after testing.
-
-No new external user results have been recorded in this report yet.
-
-## 5. Remaining Verification
-
-- Complete three external user tests.
-- Verify mobile usability at exactly 360 CSS px.
-- Collect three comparable search/refresh Network measurements.
-- Re-test all Must requirements.
-- Run the read-only PostgreSQL analytics audit with the Developer.
-- Verify the Analytics charts against actual database results.
-- Re-test R1 after Create and Delete implementation.
-
-## 6. Current Conclusion
-
-The automated analytics tests passed successfully, and the inventory CSV export was verified. However, final acceptance is still pending because external user testing, controlled performance measurements, database verification, and several functional requirements have not yet been completed.
+## Interpretation
+Final delivery addresses the originally observed customer search and staff stock problems. The result is supported by working software, merged team contributions, measured Stage 2 benchmarks and three subsequent successful external task completions. Results are reported by source/build so that an examiner can distinguish actual timed observations from a final functional check.
